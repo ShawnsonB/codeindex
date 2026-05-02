@@ -1,0 +1,9 @@
+indexer.py
+pyproject.toml
+server.py
+watcher.py
+codeindex.egg-info/PKG-INFO
+codeindex.egg-info/SOURCES.txt
+codeindex.egg-info/dependency_links.txt
+codeindex.egg-info/requires.txt
+codeindex.egg-info/top_level.txt
