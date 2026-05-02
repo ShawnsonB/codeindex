@@ -9,22 +9,47 @@ from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
 # Matches C# method, property, constructor, and type declaration lines.
 # Requires at least one access/modifier keyword so we don't split on variable
 # assignments or attribute lines.
-_DECL_RE = re.compile(
+_CS_DECL_RE = re.compile(
     r"^\s*(?:(?:public|private|protected|internal|static|virtual|override|"
     r"abstract|async|sealed|partial|readonly|new|extern)\s+)+"
     r"[\w<>\[\]?,\s]*\w\s*[\(\{<]"
 )
+
+# Matches PHP named function/method and type declarations.
+# Excludes anonymous closures ($fn = function() {) by requiring a word character
+# immediately after "function ". Arrow functions (fn($x) => ...) use a distinct
+# keyword and are not matched here.
+# Also excludes anonymous class instantiations (new class {).
+_PHP_DECL_RE = re.compile(
+    r"^\s*(?:(?:abstract|final|readonly)\s+)*(?:class|interface|trait|enum)\s+\w"
+    r"|"
+    r"^\s*(?:(?:public|protected|private|static|abstract|final)\s+)*function\s+\w"
+)
+
+# Registry mapping file extension to the compiled declaration regex for chunking.
+# Extensions not listed here fall back to the single-chunk behaviour.
+_CHUNKERS: dict[str, re.Pattern] = {
+    ".cs": _CS_DECL_RE,
+    ".php": _PHP_DECL_RE,
+}
+
+# Keep the old name as an alias so any external code that imported it still works.
+_DECL_RE = _CS_DECL_RE
 
 
 def _file_hash(path: Path) -> str:
     return hashlib.md5(path.read_bytes()).hexdigest()
 
 
-def _chunk(content: str, rel_path: str) -> list[dict]:
+def _chunk(content: str, rel_path: str, decl_re: re.Pattern | None = None) -> list[dict]:
     lines = content.splitlines()
+
+    if decl_re is None:
+        return [{"content": content, "start": 0, "end": len(lines) - 1, "path": rel_path}]
+
     split_points = [
         i for i, ln in enumerate(lines)
-        if _DECL_RE.match(ln) and not ln.strip().startswith("//")
+        if decl_re.match(ln) and not ln.strip().startswith("//")
     ]
 
     if not split_points:
@@ -79,7 +104,8 @@ class Indexer:
         self._delete_by_path(rel)
 
         content = path.read_text(encoding="utf-8", errors="replace")
-        chunks = _chunk(content, rel)
+        decl_re = _CHUNKERS.get(path.suffix.lower())
+        chunks = _chunk(content, rel, decl_re)
 
         self._collection.upsert(
             ids=[f"{rel}:{c['start']}" for c in chunks],
