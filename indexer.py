@@ -26,11 +26,39 @@ _PHP_DECL_RE = re.compile(
     r"^\s*(?:(?:public|protected|private|static|abstract|final)\s+)*function\s+\w"
 )
 
+# Matches C and C++ function definitions and type declarations.
+# Covers:
+#   - Free functions and methods:  ReturnType name(  or  Type* name(
+#   - Operator overloads:          operator<op>(
+#   - Constructors/destructors:    ClassName(  or  ~ClassName(
+#   - Type declarations:           struct/class/union/enum (name or template<…> name)
+# Excluded on purpose:
+#   - Pure forward declarations (no body) are still split points — they are rare
+#     at file scope and the false-positive cost is low.
+#   - Preprocessor lines (#define, #include) are excluded by the leading non-# check.
+#   - Variable declarations that happen to end with ( would be unusual; the regex
+#     requires a word character immediately before ( to reduce those cases.
+_C_DECL_RE = re.compile(
+    r"^(?!\s*#)"                             # not a preprocessor directive
+    r"\s*"
+    r"(?:"
+    r"(?:(?:inline|static|extern|virtual|explicit|constexpr|consteval|constinit|"
+    r"__forceinline|__inline|__cdecl|__stdcall|__fastcall)\s+)*"
+    r"(?:[\w:~*&<>, \t]+?)\s*(?:operator\s*[^\s(]+|\w+)\s*\("  # return-type name( or operator<op>(
+    r"|"
+    r"(?:struct|class|union|enum(?:\s+class)?)\s+\w"  # type declaration
+    r")"
+)
+
 # Registry mapping file extension to the compiled declaration regex for chunking.
 # Extensions not listed here fall back to the single-chunk behaviour.
 _CHUNKERS: dict[str, re.Pattern] = {
     ".cs": _CS_DECL_RE,
     ".php": _PHP_DECL_RE,
+    ".c": _C_DECL_RE,
+    ".cpp": _C_DECL_RE,
+    ".h": _C_DECL_RE,
+    ".hpp": _C_DECL_RE,
 }
 
 # Keep the old name as an alias so any external code that imported it still works.

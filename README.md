@@ -128,6 +128,8 @@ Source files are split at declaration boundaries by detecting lines that begin w
 
 **PHP (`.php`)** — splits on named function/method declarations (including optional visibility and modifier keywords before `function`) and type declarations (`class`, `abstract class`, `final class`, `interface`, `trait`, `enum`). Anonymous closures (`$fn = function() {`) and arrow functions (`fn() =>`) are intentionally **not** treated as split points, since they are inline expressions rather than declaration boundaries.
 
+**C/C++ (`.c`, `.cpp`, `.h`, `.hpp`)** — splits on function definitions (free functions, methods, operator overloads, constructors, and destructors) and type declarations (`struct`, `class`, `union`, `enum`, `enum class`). Common specifiers such as `inline`, `static`, `extern`, `virtual`, `explicit`, `constexpr`, and MSVC calling-convention attributes are recognised as optional prefixes. Preprocessor directives (`#define`, `#include`, etc.) are never treated as split points.
+
 For extensions without a registered chunker the file is stored as a single chunk (same as if no split points were found). To add support for another language, add a compiled regex to the `_CHUNKERS` dict in `indexer.py`.
 
 ---
@@ -168,6 +170,26 @@ Each project gets its own isolated index. Add a second entry to `~/.claude.json`
         "--root", "/home/you/Workspace/MyApp/src",
         "--store", "/home/you/Workspace/MyApp/.codeindex",
         "--ext", ".php"
+      ],
+      "env": {}
+    }
+  }
+}
+```
+
+**C/C++ project:**
+
+```json
+"/home/you/Workspace/MyEngine": {
+  "mcpServers": {
+    "codeindex": {
+      "type": "stdio",
+      "command": "/home/you/Workspace/codeindex/.venv/bin/python",
+      "args": [
+        "/home/you/Workspace/codeindex/server.py",
+        "--root", "/home/you/Workspace/MyEngine/src",
+        "--store", "/home/you/Workspace/MyEngine/.codeindex",
+        "--ext", ".cpp,.h,.hpp,.c"
       ],
       "env": {}
     }

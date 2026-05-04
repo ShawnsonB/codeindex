@@ -66,7 +66,14 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[types.TextCont
         parts = []
         for r in results:
             ext = Path(r["path"]).suffix.lower()
-            lang = {".cs": "csharp", ".php": "php"}.get(ext, "")
+            lang = {
+                ".cs": "csharp",
+                ".php": "php",
+                ".c": "c",
+                ".cpp": "cpp",
+                ".h": "c",
+                ".hpp": "cpp",
+            }.get(ext, "")
             parts.append(f"### {r['path']} (lines {r['start_line']}–{r['end_line']}, score {r['score']})")
             parts.append(f"```{lang}")
             parts.append(r["content"])
