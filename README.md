@@ -122,9 +122,13 @@ your-project/
 
 ## Chunking strategy
 
-Source files are split at method, class, property, and constructor boundaries by detecting lines that begin with C# access/modifier keywords (`public`, `private`, `protected`, etc.). Everything before the first detected declaration is kept as a preamble chunk (using statements, class header). This gives method-level granularity without requiring a full language parser.
+Source files are split at declaration boundaries by detecting lines that begin with language-specific keywords. Everything before the first detected declaration is kept as a preamble chunk (imports, namespace, class header). This gives method-level granularity without requiring a full language parser.
 
-To index a language other than C#, adjust the `_DECL_RE` regex in `indexer.py` or contribute a language-aware chunker.
+**C# (`.cs`)** — splits on lines that begin with one or more access/modifier keywords (`public`, `private`, `protected`, `internal`, `static`, `virtual`, `override`, `abstract`, `async`, `sealed`, `partial`, `readonly`, `new`, `extern`), covering methods, properties, constructors, and type declarations.
+
+**PHP (`.php`)** — splits on named function/method declarations (including optional visibility and modifier keywords before `function`) and type declarations (`class`, `abstract class`, `final class`, `interface`, `trait`, `enum`). Anonymous closures (`$fn = function() {`) and arrow functions (`fn() =>`) are intentionally **not** treated as split points, since they are inline expressions rather than declaration boundaries.
+
+For extensions without a registered chunker the file is stored as a single chunk (same as if no split points were found). To add support for another language, add a compiled regex to the `_CHUNKERS` dict in `indexer.py`.
 
 ---
 
@@ -132,17 +136,38 @@ To index a language other than C#, adjust the `_DECL_RE` regex in `indexer.py` o
 
 Each project gets its own isolated index. Add a second entry to `~/.claude.json` under the new project's path, pointing `--root` and `--store` at the new project's directories. No other configuration is shared between projects.
 
+**C# project:**
+
 ```json
-"/home/you/Workspace/OtherProject": {
+"/home/you/Workspace/MyGame": {
   "mcpServers": {
     "codeindex": {
       "type": "stdio",
       "command": "/home/you/Workspace/codeindex/.venv/bin/python",
       "args": [
         "/home/you/Workspace/codeindex/server.py",
-        "--root", "/home/you/Workspace/OtherProject/src",
-        "--store", "/home/you/Workspace/OtherProject/.codeindex",
-        "--ext", ".py"
+        "--root", "/home/you/Workspace/MyGame/Assets/Scripts",
+        "--store", "/home/you/Workspace/MyGame/.codeindex"
+      ],
+      "env": {}
+    }
+  }
+}
+```
+
+**PHP project:**
+
+```json
+"/home/you/Workspace/MyApp": {
+  "mcpServers": {
+    "codeindex": {
+      "type": "stdio",
+      "command": "/home/you/Workspace/codeindex/.venv/bin/python",
+      "args": [
+        "/home/you/Workspace/codeindex/server.py",
+        "--root", "/home/you/Workspace/MyApp/src",
+        "--store", "/home/you/Workspace/MyApp/.codeindex",
+        "--ext", ".php"
       ],
       "env": {}
     }
