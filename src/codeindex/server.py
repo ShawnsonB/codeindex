@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import sys
 import threading
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
@@ -10,8 +11,13 @@ import mcp.types as types
 from mcp.server.lowlevel import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 
-from indexer import Indexer
-from watcher import FileWatcher
+from codeindex.indexer import Indexer
+from codeindex.watcher import FileWatcher
+
+try:
+    _version = version("codeindex")
+except PackageNotFoundError:
+    _version = "0.1.0"
 
 server = Server("codeindex")
 _indexer: Indexer | None = None
@@ -150,7 +156,7 @@ async def main():
                 write_stream,
                 InitializationOptions(
                     server_name="codeindex",
-                    server_version="0.1.0",
+                    server_version=_version,
                     capabilities=server.get_capabilities(
                         notification_options=NotificationOptions(),
                         experimental_capabilities={},
@@ -161,5 +167,9 @@ async def main():
         _watcher.stop()
 
 
-if __name__ == "__main__":
+def run():
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    run()

@@ -1,5 +1,9 @@
 # codeindex
 
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![MCP Compatible](https://img.shields.io/badge/MCP-compatible-purple.svg)](https://modelcontextprotocol.io/)
+
 A local, free, self-hosted semantic code search tool that plugs into Claude Code as an MCP server. It indexes source files using vector embeddings, watches for changes, and exposes a `search_codebase` tool so Claude can find relevant code by meaning rather than exact text match.
 
 No cloud, no subscription, no API keys. The index lives in your project directory and travels with it.
@@ -8,7 +12,7 @@ No cloud, no subscription, no API keys. The index lives in your project director
 
 ## How it works
 
-1. On startup, `server.py` indexes all source files under `--root` by splitting them into method-level chunks and embedding each chunk with `all-MiniLM-L6-v2` (downloaded once via ONNX on first run, ~23 MB).
+1. On startup, the `codeindex` server indexes all source files under `--root` by splitting them into method-level chunks and embedding each chunk with `BAAI/bge-base-en-v1.5` via `sentence-transformers` (downloaded once on first run, ~440 MB).
 2. Embeddings are stored in a local [ChromaDB](https://www.trychroma.com/) database at the configured store path.
 3. A `watchdog` file watcher runs in the background and re-indexes any file the moment it's saved. Only changed files are re-processed (tracked via MD5 hash).
 4. Claude Code connects to the server over stdio and calls `search_codebase` whenever it needs to locate code semantically.
@@ -28,7 +32,7 @@ No cloud, no subscription, no API keys. The index lives in your project director
 
 ```bash
 cd ~/Workspace   # or wherever you keep tools
-git clone <repo-url> codeindex
+git clone https://github.com/ShawnsonB/codeindex codeindex
 cd codeindex
 uv venv .venv
 uv pip install -e . --python .venv/bin/python
@@ -41,9 +45,8 @@ MCP servers for a project are configured in `~/.claude.json` under the `projects
 ```json
 "codeindex": {
   "type": "stdio",
-  "command": "/absolute/path/to/codeindex/.venv/bin/python",
+  "command": "/absolute/path/to/codeindex/.venv/bin/codeindex",
   "args": [
-    "/absolute/path/to/codeindex/server.py",
     "--root", "/path/to/your/project/src",
     "--store", "/path/to/your/project/.codeindex"
   ],
@@ -145,9 +148,8 @@ Each project gets its own isolated index. Add a second entry to `~/.claude.json`
   "mcpServers": {
     "codeindex": {
       "type": "stdio",
-      "command": "/home/you/Workspace/codeindex/.venv/bin/python",
+      "command": "/home/you/Workspace/codeindex/.venv/bin/codeindex",
       "args": [
-        "/home/you/Workspace/codeindex/server.py",
         "--root", "/home/you/Workspace/MyGame/Assets/Scripts",
         "--store", "/home/you/Workspace/MyGame/.codeindex"
       ],
@@ -164,9 +166,8 @@ Each project gets its own isolated index. Add a second entry to `~/.claude.json`
   "mcpServers": {
     "codeindex": {
       "type": "stdio",
-      "command": "/home/you/Workspace/codeindex/.venv/bin/python",
+      "command": "/home/you/Workspace/codeindex/.venv/bin/codeindex",
       "args": [
-        "/home/you/Workspace/codeindex/server.py",
         "--root", "/home/you/Workspace/MyApp/src",
         "--store", "/home/you/Workspace/MyApp/.codeindex",
         "--ext", ".php"
@@ -184,9 +185,8 @@ Each project gets its own isolated index. Add a second entry to `~/.claude.json`
   "mcpServers": {
     "codeindex": {
       "type": "stdio",
-      "command": "/home/you/Workspace/codeindex/.venv/bin/python",
+      "command": "/home/you/Workspace/codeindex/.venv/bin/codeindex",
       "args": [
-        "/home/you/Workspace/codeindex/server.py",
         "--root", "/home/you/Workspace/MyEngine/src",
         "--store", "/home/you/Workspace/MyEngine/.codeindex",
         "--ext", ".cpp,.h,.hpp,.c"

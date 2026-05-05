@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 import chromadb
-from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
+from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 
 # Matches C# method, property, constructor, and type declaration lines.
 # Requires at least one access/modifier keyword so we don't split on variable
@@ -61,8 +61,7 @@ _CHUNKERS: dict[str, re.Pattern] = {
     ".hpp": _C_DECL_RE,
 }
 
-# Keep the old name as an alias so any external code that imported it still works.
-_DECL_RE = _CS_DECL_RE
+_EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
 
 
 def _file_hash(path: Path) -> str:
@@ -102,7 +101,7 @@ class Indexer:
         self._client = chromadb.PersistentClient(path=str(store_path / "db"))
         self._collection = self._client.get_or_create_collection(
             name="code",
-            embedding_function=DefaultEmbeddingFunction(),
+            embedding_function=SentenceTransformerEmbeddingFunction(model_name=_EMBEDDING_MODEL),
         )
 
         self._hash_file = store_path / "hashes.json"

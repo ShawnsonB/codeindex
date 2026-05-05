@@ -13,9 +13,9 @@ import sys
 import tempfile
 from pathlib import Path
 
-# File lives at codeindex/tests/test_codeindex.py; parent.parent is codeindex/
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from indexer import _chunk, _PHP_DECL_RE, _CS_DECL_RE, _C_DECL_RE, Indexer  # noqa: E402
+# File lives at codeindex/tests/test_codeindex.py; src/ is at parent.parent/src
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+from codeindex.indexer import _chunk, _PHP_DECL_RE, _CS_DECL_RE, _C_DECL_RE, Indexer  # noqa: E402
 
 TESTS_DIR   = Path(__file__).parent
 FIXTURES    = TESTS_DIR / "fixtures"

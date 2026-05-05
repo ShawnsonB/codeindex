@@ -7,11 +7,8 @@ How to run, extend, and interpret the smoke tests in `tests/test_codeindex.py`.
 ## Quick start
 
 ```bash
-# From Workspace root:
-/home/shawn/Workspace/codeindex/.venv/bin/python codeindex/tests/test_codeindex.py
-
-# Or from inside codeindex/:
-cd /home/shawn/Workspace/codeindex && .venv/bin/python tests/test_codeindex.py
+# From the repository root:
+.venv/bin/python tests/test_codeindex.py
 ```
 
 Running with plain `python tests/test_codeindex.py` fails with
@@ -34,7 +31,12 @@ doesn't have the project's dependencies. Always use the venv.
 
 ```
 codeindex/
-├── indexer.py              ← the package under test
+├── src/
+│   └── codeindex/
+│       ├── __init__.py
+│       ├── indexer.py      ← the package under test
+│       ├── server.py
+│       └── watcher.py
 ├── .venv/
 └── tests/
     ├── test_codeindex.py
@@ -49,30 +51,7 @@ codeindex/
 
 ## Known issues (pre-existing, not regressions)
 
-### 1. Negative scores from DefaultEmbeddingFunction
-
-Several "top result has a positive score" checks **fail** for both C# and C/C++:
-
-```
-[FAIL] top result has a positive score: score=-0.019   ← C#
-[FAIL] top result has a positive score: score=-0.224   ← C/C++
-```
-
-**Cause:** `DefaultEmbeddingFunction` from chromadb uses cosine distance.
-The score is computed as `1.0 - distance`. When the distance exceeds 1.0
-(which happens with this embedding function on short or out-of-domain
-chunks), the score goes negative. This is not a bug in the chunker or
-indexer logic — it is a limitation of the default embedder.
-
-**Impact:** Semantic search still returns the right files; only the score
-value is misleading. PHP tests pass this check because the PHP test corpus
-is coherent enough that distances stay under 1.0.
-
-**Fix when desired:** Replace `DefaultEmbeddingFunction` with a real model
-(e.g. `SentenceTransformerEmbeddingFunction`). The test check is kept as-is
-to surface if the situation changes.
-
-### 2. `if (` / `for (` / `while (` are false-positive split points in C/C++
+### `if (` / `for (` / `while (` are false-positive split points in C/C++
 
 `_C_DECL_RE` matches any `word(` pattern at line start (unless the line
 begins with `#`). This means control-flow keywords inside function bodies
@@ -98,7 +77,7 @@ trade-off ("the false-positive cost is low").
 
 ## Adding tests for a new language
 
-When a new language is added to `_CHUNKERS` in `indexer.py`:
+When a new language is added to `_CHUNKERS` in `src/codeindex/indexer.py`:
 
 1. **Create a test corpus directory** inside `tests/fixtures/`, e.g. `tests/fixtures/go/`
    with 3–6 source files that cover the domain vocabulary you'll search against.
@@ -128,7 +107,7 @@ When a new language is added to `_CHUNKERS` in `indexer.py`:
 ## Importing from the indexer
 
 ```python
-from indexer import (
+from codeindex.indexer import (
     _chunk,
     _CS_DECL_RE,   # C#
     _PHP_DECL_RE,  # PHP
@@ -137,8 +116,8 @@ from indexer import (
 )
 ```
 
-`_CHUNKERS` (the extension→regex registry) and `_DECL_RE` (legacy alias for
-`_CS_DECL_RE`) are also importable if needed for introspection.
+`_CHUNKERS` (the extension→regex registry) is also importable if needed for
+introspection.
 
 ---
 
@@ -149,7 +128,7 @@ from indexer import (
 [FAIL] ...   red    — assertion failed; detail printed after the colon
 ```
 
-FAIL lines that match the known-issues above are expected. Any other FAIL
+FAIL lines that match the known issues above are expected. Any other FAIL
 line indicates a genuine regression.
 
 At the end of each section a summary line prints:
