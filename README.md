@@ -88,6 +88,69 @@ The server starts automatically when Claude Code loads the project. Watch stderr
 
 ---
 
+## Querying from the terminal
+
+In addition to Claude Code using `search_codebase` automatically during conversations, you can query the index yourself with `codeindex-query`.
+
+### One-shot search
+
+Pass a query as a positional argument and results print immediately:
+
+```bash
+codeindex-query "how is damage applied to the player"
+codeindex-query --n 10 "entity spawning logic"
+```
+
+Each result renders as a syntax-highlighted panel showing the file path, the matching code with real line numbers, and a relevance score (0–1, higher is better).
+
+### Interactive REPL
+
+Omit the query to enter a prompt loop — useful for exploring unfamiliar code:
+
+```bash
+codeindex-query
+```
+
+```
+codeindex interactive query  (Ctrl-C or Ctrl-D to quit)
+──────────────────────────────────────────────────────────────
+> how is damage applied to the player
+╭─ Combat/HealthComponent.cs ─────────────────────────────────╮
+│  42  public void ApplyDamage(float amount, DamageType type) │
+│  ...                                                        │
+╰──────────────── lines 42–47  score 0.912  (1/5) ───────────╯
+> player movement and jump logic
+...
+> ^C
+Bye.
+```
+
+### Index status
+
+```bash
+codeindex-query --status
+```
+
+```
+  Root            /home/you/Workspace/MyGame/Assets/Scripts
+  Indexed files   47
+  Indexed chunks  312
+```
+
+### Options
+
+| Flag | Default | Description |
+|---|---|---|
+| `query` | — | Search query (positional, optional — omit for REPL mode) |
+| `--n INT` | `5` | Number of results to return |
+| `--status` | — | Print index statistics and exit |
+| `--store PATH` | auto-detected | Path to `.codeindex` store directory |
+| `--root PATH` | store parent | Root directory the index was built from |
+
+`codeindex-query` auto-detects the store by walking up from the current directory looking for a `.codeindex` folder, so you can run it from anywhere inside your project without extra flags. Pass `--store` and `--root` explicitly when querying an index that lives outside the current directory tree.
+
+---
+
 ## MCP tools
 
 ### `search_codebase`
