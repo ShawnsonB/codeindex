@@ -3,9 +3,11 @@ from pathlib import Path
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
+from codeindex.indexer import Indexer
+
 
 class _Handler(FileSystemEventHandler):
-    def __init__(self, indexer, extensions: tuple[str, ...]):
+    def __init__(self, indexer: Indexer, extensions: tuple[str, ...]):
         self._indexer = indexer
         self._extensions = extensions
 
@@ -33,7 +35,7 @@ class _Handler(FileSystemEventHandler):
 
 
 class FileWatcher:
-    def __init__(self, indexer, root: Path, extensions: tuple[str, ...] = (".cs",)):
+    def __init__(self, indexer: Indexer, root: Path, extensions: tuple[str, ...] = (".cs",)):
         self._observer = Observer()
         self._observer.schedule(_Handler(indexer, extensions), str(root), recursive=True)
 
