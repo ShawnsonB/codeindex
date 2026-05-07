@@ -20,6 +20,7 @@ classifiers = [
 dependencies = [
     "chromadb>=0.6",
     "mcp>=1.0",
+    "rich>=13.0",
     "sentence-transformers>=3.0",
     "watchdog>=4.0",
 ]
@@ -29,7 +30,8 @@ Homepage = "https://github.com/ShawnsonB/codeindex"
 Repository = "https://github.com/ShawnsonB/codeindex"
 
 [project.scripts]
-codeindex = "codeindex.server:run"
+codeindex       = "codeindex.server:run"
+codeindex-query = "codeindex.cli:run"
 
 [tool.setuptools.packages.find]
 where = ["src"]
