@@ -1,4 +1,5 @@
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -11,6 +12,16 @@ from rich.table import Table
 from codeindex.indexer import Indexer
 
 console = Console()
+
+
+def _positive_int(value: str) -> int:
+    try:
+        n = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"--n must be a positive integer, got {value!r}")
+    if n < 1:
+        raise argparse.ArgumentTypeError(f"--n must be a positive integer, got {n}")
+    return n
 
 
 def _find_store(start: Path) -> Path | None:
@@ -88,14 +99,14 @@ def _build_parser() -> argparse.ArgumentParser:
         "--root",
         default=None,
         metavar="PATH",
-        help="Root directory the index was built from (defaults to store parent).",
+        help="Root directory the index was built from (read from store meta.json if omitted).",
     )
     parser.add_argument(
         "--n",
-        type=int,
+        type=_positive_int,
         default=5,
         metavar="INT",
-        help="Number of results to return (default: 5).",
+        help="Number of results to return (default: 5, must be >= 1).",
     )
     parser.add_argument(
         "--status",
@@ -125,7 +136,17 @@ def _resolve_indexer(args) -> Indexer:
         console.print(f"[red]Error:[/red] Store path does not exist: {store_path}")
         sys.exit(1)
 
-    root = Path(args.root).resolve() if args.root else store_path.parent
+    if args.root:
+        root = Path(args.root).resolve()
+    else:
+        meta_file = store_path / "meta.json"
+        if meta_file.exists():
+            try:
+                root = Path(json.loads(meta_file.read_text())["root"])
+            except (KeyError, json.JSONDecodeError, OSError):
+                root = store_path.parent
+        else:
+            root = store_path.parent
 
     if not root.is_dir():
         console.print(f"[red]Error:[/red] Root path does not exist: {root}")

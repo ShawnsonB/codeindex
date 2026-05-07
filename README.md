@@ -92,6 +92,23 @@ The server starts automatically when Claude Code loads the project. Watch stderr
 
 In addition to Claude Code using `search_codebase` automatically during conversations, you can query the index yourself with `codeindex-query`.
 
+### Invoking the CLI
+
+Either activate the venv first:
+
+```bash
+source /path/to/codeindex/.venv/bin/activate
+codeindex-query "your query here"
+```
+
+Or call the binary directly without activating:
+
+```bash
+/path/to/codeindex/.venv/bin/codeindex-query "your query here"
+```
+
+Run `codeindex-query` from anywhere inside the project you indexed — it walks up the directory tree to find the `.codeindex` store automatically.
+
 ### One-shot search
 
 Pass a query as a positional argument and results print immediately:
@@ -101,7 +118,7 @@ codeindex-query "how is damage applied to the player"
 codeindex-query --n 10 "entity spawning logic"
 ```
 
-Each result renders as a syntax-highlighted panel showing the file path, the matching code with real line numbers, and a relevance score (0–1, higher is better).
+Each result renders as a syntax-highlighted panel showing the file path, the matching code with real line numbers, and a relevance score (higher is better, clamped to 0–1).
 
 ### Interactive REPL
 
@@ -145,7 +162,7 @@ codeindex-query --status
 | `--n INT` | `5` | Number of results to return |
 | `--status` | — | Print index statistics and exit |
 | `--store PATH` | auto-detected | Path to `.codeindex` store directory |
-| `--root PATH` | store parent | Root directory the index was built from |
+| `--root PATH` | read from store meta.json | Root directory the index was built from |
 
 `codeindex-query` auto-detects the store by walking up from the current directory looking for a `.codeindex` folder, so you can run it from anywhere inside your project without extra flags. Pass `--store` and `--root` explicitly when querying an index that lives outside the current directory tree.
 
@@ -162,7 +179,7 @@ Semantic search over the indexed source files.
 | `query` | string | required | Natural language or code query |
 | `n_results` | integer | 5 | Number of chunks to return (max 20) |
 
-Returns matching code chunks with file path, line range, and a relevance score (0–1, higher is better).
+Returns matching code chunks with file path, line range, and a relevance score (higher is better, clamped to 0–1).
 
 Example queries:
 - `"how is damage applied to the player"`

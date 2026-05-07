@@ -98,6 +98,9 @@ class Indexer:
         self._root = root.resolve()
         store_path.mkdir(parents=True, exist_ok=True)
 
+        # Persist root so codeindex-query can recover it without --root.
+        (store_path / "meta.json").write_text(json.dumps({"root": str(self._root)}))
+
         self._client = chromadb.PersistentClient(path=str(store_path / "db"))
         self._collection = self._client.get_or_create_collection(
             name="code",
@@ -178,7 +181,7 @@ class Indexer:
                 "start_line": meta["start"] + 1,
                 "end_line": meta["end"] + 1,
                 "content": doc,
-                "score": round(1.0 - dist, 3),
+                "score": round(max(0.0, min(1.0, 1.0 - dist)), 3),
             })
         return out
 
