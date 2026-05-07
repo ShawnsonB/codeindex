@@ -1,0 +1,6 @@
+# All files require review from the repo owner
+*                          @ShawnsonB
+
+# CI/CD and security-sensitive config
+/.github/workflows/        @ShawnsonB
+pyproject.toml             @ShawnsonB
