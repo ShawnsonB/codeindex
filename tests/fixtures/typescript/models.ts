@@ -69,4 +69,4 @@ export function buildLeaderboard(players: PlayerProfile[]): LeaderboardEntry[] {
         .map((player, index) => ({ position: index + 1, player, delta: 0 }));
 }
 
-export const computeRankDelta = (prev: number, curr: number): number => curr - prev;
+export const computeDelta = (prev: number, curr: number): number => curr - prev;
