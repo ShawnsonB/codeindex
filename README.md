@@ -10,7 +10,29 @@ No cloud, no subscription, no API keys. The index lives in your project director
 
 ---
 
-## How it works
+## Supported languages
+
+| Language | Extensions | Declaration-aware chunking |
+|---|---|---|
+| **C#** | `.cs` | ✅ methods, properties, constructors, type declarations |
+| **PHP** | `.php` | ✅ named functions, classes, interfaces, traits, enums |
+| **C** | `.c`, `.h`, `.hh`, `.hxx` | ✅ functions, structs, unions, enums |
+| **C++** | `.cpp`, `.hpp`, `.cc`, `.cxx` | ✅ functions, classes, operators, constructors, destructors |
+| **Python** | `.py` | ✅ `def`, `async def`, `class` |
+| **JavaScript** | `.js`, `.mjs`, `.cjs` | ✅ `function`, `class`, arrow/expression assignments, methods with modifiers |
+| **TypeScript** | `.ts`, `.tsx` | ✅ all JS patterns plus `interface`, `enum`, `type` aliases, typed method signatures |
+| **Java** | `.java` | ✅ methods, constructors, `class`, `interface`, `enum`, `record`, annotation types |
+| **Go** | `.go` | ✅ `func` declarations (including methods with receivers), `type … struct/interface` |
+| **Ruby** | `.rb` | ✅ `def`, `def self.*`, `class`, `module`, `attr_reader/writer/accessor` |
+| **Rust** | `.rs` | ✅ `fn`, `impl`, `struct`, `enum`, `trait`, `union`, `macro_rules!`, `pub(…)` visibility |
+| **SQL** | `.sql` | ✅ DDL statements: `CREATE/ALTER/DROP TABLE/VIEW/INDEX/PROCEDURE/FUNCTION/…` |
+| **Assembly** | `.asm`, `.s`, `.S` | ✅ column-0 labels, `section .…` directives, MASM `PROC`/`ENDP` |
+
+Files whose extension is not in this table are indexed as a single chunk.
+
+---
+
+
 
 1. On startup, the `codeindex` server indexes all source files under `--root` by splitting them into method-level chunks and embedding each chunk with `BAAI/bge-base-en-v1.5` via `sentence-transformers` (downloaded once on first run, ~440 MB).
 2. Embeddings are stored in a local [ChromaDB](https://www.trychroma.com/) database at the configured store path.
@@ -72,7 +94,7 @@ The server starts automatically when Claude Code loads the project. Watch stderr
 
 ```
 [codeindex] store: /your/project/.codeindex
-[codeindex] watching /your/project/src for ('.cs',)
+[codeindex] watching /your/project/src for ('.cs', '.php', '.c', ...)
 [codeindex] initial index complete: 47 file(s) updated
 ```
 
@@ -83,7 +105,7 @@ The server starts automatically when Claude Code loads the project. Watch stderr
 | Argument | Required | Default | Description |
 |---|---|---|---|
 | `--root` | Yes | — | Directory to index (recursive) |
-| `--ext` | No | `.cs` | Comma-separated file extensions, e.g. `--ext .cs,.py` |
+| `--ext` | No | all supported extensions | Comma-separated file extensions, e.g. `--ext .py,.ts,.go` |
 | `--store` | No | `{git_root}/.codeindex` | Where to persist ChromaDB data and the hash file |
 
 ---
@@ -211,7 +233,25 @@ Source files are split at declaration boundaries by detecting lines that begin w
 
 **PHP (`.php`)** — splits on named function/method declarations (including optional visibility and modifier keywords before `function`) and type declarations (`class`, `abstract class`, `final class`, `interface`, `trait`, `enum`). Anonymous closures (`$fn = function() {`) and arrow functions (`fn() =>`) are intentionally **not** treated as split points, since they are inline expressions rather than declaration boundaries.
 
-**C/C++ (`.c`, `.cpp`, `.h`, `.hpp`)** — splits on function definitions (free functions, methods, operator overloads, constructors, and destructors) and type declarations (`struct`, `class`, `union`, `enum`, `enum class`). Common specifiers such as `inline`, `static`, `extern`, `virtual`, `explicit`, `constexpr`, and MSVC calling-convention attributes are recognised as optional prefixes. Preprocessor directives (`#define`, `#include`, etc.) are never treated as split points.
+**C/C++ (`.c`, `.cpp`, `.h`, `.hpp`, `.cc`, `.cxx`, `.hh`, `.hxx`)** — splits on function definitions (free functions, methods, operator overloads, constructors, and destructors) and type declarations (`struct`, `class`, `union`, `enum`, `enum class`). Common specifiers such as `inline`, `static`, `extern`, `virtual`, `explicit`, `constexpr`, and MSVC calling-convention attributes are recognised as optional prefixes. Preprocessor directives (`#define`, `#include`, etc.) are never treated as split points.
+
+**Python (`.py`)** — splits on `def`, `async def`, and `class` lines at any indentation level, covering free functions, methods, and class definitions.
+
+**JavaScript (`.js`, `.mjs`, `.cjs`)** — splits on `function` keyword declarations, `class` declarations, arrow-function and function-expression assignments (`const/let/var name = …`), and method shorthands that carry at least one modifier keyword (`static`, `async`, `get`, `set`). Bare `if (`, `for (`, etc. are not split points.
+
+**TypeScript (`.ts`, `.tsx`)** — all JavaScript patterns plus `interface`, `const enum` / `enum`, `type` aliases, and typed method signatures prefixed with access modifiers (`public`, `private`, `protected`, `readonly`, `abstract`, `override`).
+
+**Java (`.java`)** — splits on lines with at least one access/modifier keyword (`public`, `protected`, `private`, `static`, `final`, `abstract`, `synchronized`, etc.) followed by a method signature or type keyword, plus bare top-level `class`, `interface`, `enum`, `record`, and `@interface` declarations.
+
+**Go (`.go`)** — splits on `func` declarations (free functions and methods with receivers) and `type … struct` / `type … interface` declarations.
+
+**Ruby (`.rb`)** — splits on `def`, `def self.method`, `class`, `module`, and `attr_reader/writer/accessor` lines.
+
+**Rust (`.rs`)** — splits on `fn`, `impl`, `struct`, `enum`, `trait`, `union`, and `macro_rules!` items, with optional `pub`, `pub(crate)`, `pub(super)`, `unsafe`, and `async` prefixes.
+
+**SQL (`.sql`)** — splits on DDL statements: `CREATE`, `ALTER`, and `DROP` followed by an object type keyword (`TABLE`, `VIEW`, `INDEX`, `PROCEDURE`, `FUNCTION`, `TRIGGER`, etc.). Routine DML (`INSERT`, `UPDATE`, `DELETE`, `SELECT`) is intentionally **not** split to avoid excessive fragmentation.
+
+**Assembly (`.asm`, `.s`, `.S`)** — splits on column-0 label definitions (`name:`), `section .…` directives (ELF/NASM), and MASM-style `PROC`/`ENDP` markers.
 
 For extensions without a registered chunker the file is stored as a single chunk (same as if no split points were found). To add support for another language, add a compiled regex to the `_CHUNKERS` dict in `indexer.py`.
 
@@ -221,17 +261,19 @@ For extensions without a registered chunker the file is stored as a single chunk
 
 Each project gets its own isolated index. Add a second entry to `~/.claude.json` under the new project's path, pointing `--root` and `--store` at the new project's directories. No other configuration is shared between projects.
 
-**C# project:**
+By default the server indexes every supported language. Pass `--ext` to restrict indexing to specific extensions — useful when a project has many files in languages you don't want to search.
+
+**Multi-language project (default — all supported extensions):**
 
 ```json
-"/home/you/Workspace/MyGame": {
+"/home/you/Workspace/MyApp": {
   "mcpServers": {
     "codeindex": {
       "type": "stdio",
       "command": "/home/you/Workspace/codeindex/.venv/bin/codeindex",
       "args": [
-        "--root", "/home/you/Workspace/MyGame/Assets/Scripts",
-        "--store", "/home/you/Workspace/MyGame/.codeindex"
+        "--root", "/home/you/Workspace/MyApp/src",
+        "--store", "/home/you/Workspace/MyApp/.codeindex"
       ],
       "env": {}
     }
@@ -239,7 +281,7 @@ Each project gets its own isolated index. Add a second entry to `~/.claude.json`
 }
 ```
 
-**PHP project:**
+**Restricting to specific languages (e.g. TypeScript + Go):**
 
 ```json
 "/home/you/Workspace/MyApp": {
@@ -250,7 +292,7 @@ Each project gets its own isolated index. Add a second entry to `~/.claude.json`
       "args": [
         "--root", "/home/you/Workspace/MyApp/src",
         "--store", "/home/you/Workspace/MyApp/.codeindex",
-        "--ext", ".php"
+        "--ext", ".ts,.tsx,.go"
       ],
       "env": {}
     }
@@ -258,18 +300,18 @@ Each project gets its own isolated index. Add a second entry to `~/.claude.json`
 }
 ```
 
-**C/C++ project:**
+**C# Unity project:**
 
 ```json
-"/home/you/Workspace/MyEngine": {
+"/home/you/Workspace/MyGame": {
   "mcpServers": {
     "codeindex": {
       "type": "stdio",
       "command": "/home/you/Workspace/codeindex/.venv/bin/codeindex",
       "args": [
-        "--root", "/home/you/Workspace/MyEngine/src",
-        "--store", "/home/you/Workspace/MyEngine/.codeindex",
-        "--ext", ".cpp,.h,.hpp,.c"
+        "--root", "/home/you/Workspace/MyGame/Assets/Scripts",
+        "--store", "/home/you/Workspace/MyGame/.codeindex",
+        "--ext", ".cs"
       ],
       "env": {}
     }

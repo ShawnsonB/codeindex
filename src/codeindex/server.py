@@ -11,7 +11,7 @@ import mcp.types as types
 from mcp.server.lowlevel import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
 
-from codeindex.indexer import Indexer
+from codeindex.indexer import Indexer, _ALL_EXTENSIONS
 from codeindex.watcher import FileWatcher
 
 try:
@@ -73,12 +73,31 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[types.TextCont
         for r in results:
             ext = Path(r["path"]).suffix.lower()
             lang = {
+                # C#
                 ".cs": "csharp",
+                # PHP
                 ".php": "php",
-                ".c": "c",
-                ".cpp": "cpp",
-                ".h": "c",
-                ".hpp": "cpp",
+                # C / C++
+                ".c": "c", ".h": "c", ".hh": "c", ".hxx": "c",
+                ".cpp": "cpp", ".hpp": "cpp", ".cc": "cpp", ".cxx": "cpp",
+                # Python
+                ".py": "python",
+                # JavaScript
+                ".js": "javascript", ".mjs": "javascript", ".cjs": "javascript",
+                # TypeScript
+                ".ts": "typescript", ".tsx": "tsx",
+                # Java
+                ".java": "java",
+                # Go
+                ".go": "go",
+                # Ruby
+                ".rb": "ruby",
+                # Rust
+                ".rs": "rust",
+                # SQL
+                ".sql": "sql",
+                # Assembly
+                ".asm": "asm", ".s": "asm", ".S": "asm",
             }.get(ext, "")
             parts.append(f"### {r['path']} (lines {r['start_line']}–{r['end_line']}, score {r['score']})")
             parts.append(f"```{lang}")
@@ -115,8 +134,8 @@ async def main():
     parser.add_argument("--root", required=True, help="Root directory to index")
     parser.add_argument(
         "--ext",
-        default=".cs",
-        help="Comma-separated file extensions to index (default: .cs)",
+        default=",".join(_ALL_EXTENSIONS),
+        help="Comma-separated file extensions to index (default: all supported languages)",
     )
     parser.add_argument(
         "--store",
