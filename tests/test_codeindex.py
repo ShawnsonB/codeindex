@@ -9,13 +9,22 @@ Tests:
   5. C/C++ indexer — indexes tests/fixtures/c (6 files: 3 .h + 3 .cpp), semantic search
 """
 
+import json
 import sys
 import tempfile
 from pathlib import Path
 
 # File lives at codeindex/tests/test_codeindex.py; src/ is at parent.parent/src
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-from codeindex.indexer import _chunk, _PHP_DECL_RE, _CS_DECL_RE, _C_DECL_RE, Indexer  # noqa: E402
+from codeindex.indexer import (  # noqa: E402
+    _CHROMADB_VERSION,
+    _check_store_compat,
+    _chunk,
+    _C_DECL_RE,
+    _CS_DECL_RE,
+    _PHP_DECL_RE,
+    Indexer,
+)
 
 TESTS_DIR   = Path(__file__).parent
 FIXTURES    = TESTS_DIR / "fixtures"
@@ -308,5 +317,39 @@ with tempfile.TemporaryDirectory() as tmpdir:
     if results3:
         top3 = results3[0]
         print(f"\n  Top physics hit: {top3['path']} lines {top3['start_line']}–{top3['end_line']} (score {top3['score']})")
+
+# ---------------------------------------------------------------------------
+# 6. Version mismatch: stale store is wiped before opening
+# ---------------------------------------------------------------------------
+print("\n=== Version mismatch wipes stale store ===")
+
+with tempfile.TemporaryDirectory() as _tmp:
+    _store = Path(_tmp) / ".codeindex"
+    _store.mkdir()
+
+    # Simulate a store created by a different chromadb version
+    (_store / "meta.json").write_text(json.dumps({"root": _tmp, "chromadb_version": "0.0.0-old"}))
+    _db = _store / "db"
+    _db.mkdir()
+    (_db / "chroma.sqlite3").write_text("fake")
+    (_store / "hashes.json").write_text("{}")
+
+    _check_store_compat(_store)
+
+    ok3 = True
+    ok3 &= check("db/ wiped on version mismatch", not _db.exists())
+    ok3 &= check("hashes.json wiped on version mismatch", not (_store / "hashes.json").exists())
+    ok3 &= check("meta.json left intact by the check itself", (_store / "meta.json").exists())
+
+    # Confirm Indexer stamps the current version into meta.json on creation
+    _idx = Indexer(Path(_tmp), _store)
+    _meta = json.loads((_store / "meta.json").read_text())
+    ok3 &= check(
+        "Indexer stamps current chromadb_version in meta.json",
+        _meta.get("chromadb_version") == _CHROMADB_VERSION,
+        f"got {_meta.get('chromadb_version')!r}, expected {_CHROMADB_VERSION!r}",
+    )
+
+    print(f"\n  Version mismatch: {'all good' if ok3 else 'FAILURES ABOVE'}")
 
 print("\n=== Done ===\n")

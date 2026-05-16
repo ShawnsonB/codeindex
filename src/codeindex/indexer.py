@@ -1,6 +1,9 @@
 import hashlib
 import json
 import re
+import shutil
+import sys
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
 
 import chromadb
@@ -62,6 +65,35 @@ _CHUNKERS: dict[str, re.Pattern] = {
 }
 
 _EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
+_CHROMADB_VERSION = _pkg_version("chromadb")
+
+
+def _wipe_store(store_path: Path) -> None:
+    db_dir = store_path / "db"
+    hashes_file = store_path / "hashes.json"
+    if db_dir.exists():
+        shutil.rmtree(db_dir)
+    if hashes_file.exists():
+        hashes_file.unlink()
+
+
+def _check_store_compat(store_path: Path) -> None:
+    """Wipe the index if the stored chromadb version doesn't match the installed one."""
+    meta_file = store_path / "meta.json"
+    if not meta_file.exists():
+        return
+    try:
+        meta = json.loads(meta_file.read_text())
+    except (json.JSONDecodeError, OSError):
+        meta = {}
+    stored = meta.get("chromadb_version")
+    if stored != _CHROMADB_VERSION:
+        print(
+            f"[codeindex] chromadb version changed ({stored!r} → {_CHROMADB_VERSION!r}), "
+            "wiping stale index and rebuilding",
+            file=sys.stderr, flush=True,
+        )
+        _wipe_store(store_path)
 
 
 def _file_hash(path: Path) -> str:
@@ -98,8 +130,13 @@ class Indexer:
         self._root = root.resolve()
         store_path.mkdir(parents=True, exist_ok=True)
 
-        # Persist root so codeindex-query can recover it without --root.
-        (store_path / "meta.json").write_text(json.dumps({"root": str(self._root)}))
+        _check_store_compat(store_path)
+
+        # Persist root and chromadb version so codeindex-query can recover root
+        # without --root, and so a future version bump is detected on next startup.
+        (store_path / "meta.json").write_text(
+            json.dumps({"root": str(self._root), "chromadb_version": _CHROMADB_VERSION})
+        )
 
         self._client = chromadb.PersistentClient(path=str(store_path / "db"))
         self._collection = self._client.get_or_create_collection(
