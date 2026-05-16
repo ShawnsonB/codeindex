@@ -53,16 +53,156 @@ _C_DECL_RE = re.compile(
     r")"
 )
 
+# Matches Python function and class declarations at any indentation level.
+# Handles `async def` as well as plain `def` and `class`.
+_PY_DECL_RE = re.compile(
+    r"^\s*(?:async\s+)?def\s+\w"
+    r"|"
+    r"^\s*class\s+\w"
+)
+
+# Matches JavaScript function/class declarations, arrow-function assignments, and
+# method shorthands that carry at least one modifier keyword (static, async, get,
+# set) so bare `if (`, `for (`, etc. are not treated as method boundaries.
+_JS_DECL_RE = re.compile(
+    r"^\s*(?:export\s+(?:default\s+)?)?(?:async\s+)?function\s*\*?\s*\w"  # function keyword
+    r"|"
+    r"^\s*(?:export\s+(?:default\s+)?)?class\s+\w"  # class declaration
+    r"|"
+    r"^\s*(?:export\s+)?(?:const|let|var)\s+\w+\s*=\s*(?:async\s+)?(?:function\b|\([^)]*\)\s*=>|\w+\s*=>)"  # fn assignment
+    r"|"
+    r"^\s*(?:(?:static|async|get|set)\s+)+(?!(?:if|for|while|switch|return|throw|new|typeof|await|yield|else)\b)\w+\s*[(\[]"  # method with modifier
+)
+
+# TypeScript extends JavaScript with interfaces, enums, type aliases, and typed
+# method signatures that carry access-modifier keywords.
+_TS_DECL_RE = re.compile(
+    r"^\s*(?:export\s+(?:default\s+)?)?(?:async\s+)?function\s*\*?\s*\w"
+    r"|"
+    r"^\s*(?:export\s+(?:default\s+)?)?(?:abstract\s+)?class\s+\w"
+    r"|"
+    r"^\s*(?:export\s+)?(?:const|let|var)\s+\w+\s*=\s*(?:async\s+)?(?:function\b|\([^)]*\)\s*=>|\w+\s*=>)"
+    r"|"
+    r"^\s*(?:export\s+)?interface\s+\w"
+    r"|"
+    r"^\s*(?:export\s+)?(?:const\s+)?enum\s+\w"
+    r"|"
+    r"^\s*(?:export\s+)?type\s+\w+\s*(?:<[^>]*>)?\s*="
+    r"|"
+    r"^\s*(?:(?:public|private|protected|static|async|readonly|abstract|override|get|set)\s+)+(?!(?:if|for|while|switch|return|throw|new|typeof|await|yield|else)\b)\w+\s*[(<]"
+)
+
+# Matches Java method, constructor, and type declarations.
+# Requires at least one access/modifier keyword for method declarations to avoid
+# matching control-flow lines. Top-level type declarations are matched directly.
+_JAVA_DECL_RE = re.compile(
+    r"^\s*(?:(?:public|protected|private|static|final|abstract|synchronized|"
+    r"native|transient|volatile|default|strictfp)\s+)+"
+    r"(?:[\w<>\[\]@.,\s]*\w\s*\(|(?:class|interface|enum|record)\s+\w)"
+    r"|"
+    r"^\s*(?:class|interface|enum|record)\s+\w"
+    r"|"
+    r"^\s*@interface\s+\w"  # annotation type declaration
+)
+
+# Matches Go function and method declarations, and named struct/interface types.
+# Method receivers (`func (r *Receiver) Name(`) are handled by the optional
+# `(?:\([^)]+\)\s*)?` group before the function name.
+_GO_DECL_RE = re.compile(
+    r"^\s*func\s+(?:\([^)]+\)\s*)?\w"
+    r"|"
+    r"^\s*type\s+\w+\s+(?:struct|interface)\b"
+)
+
+# Matches Ruby method, class, and module declarations.
+# Handles `def self.method` class-level methods and common `attr_*` macros.
+_RUBY_DECL_RE = re.compile(
+    r"^\s*def\s+(?:self\.)?\w"
+    r"|"
+    r"^\s*(?:class|module)\s+\w"
+    r"|"
+    r"^\s*attr_(?:reader|writer|accessor)\b"
+)
+
+# Matches Rust item declarations: functions, impls, structs, enums, traits,
+# unions, and macro_rules! blocks.  Handles optional visibility qualifiers
+# (pub, pub(crate), pub(super), pub(in path)).
+_RUST_DECL_RE = re.compile(
+    r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:unsafe\s+)?(?:async\s+)?fn\s+\w"
+    r"|"
+    r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:unsafe\s+)?impl(?:\s*<[^>]*>)?\s+\w"
+    r"|"
+    r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:struct|enum|trait|union)\s+\w"
+    r"|"
+    r"^\s*macro_rules!\s+\w"
+)
+
+# Matches SQL DDL statements that open a new object definition.
+# Intentionally conservative: only CREATE/ALTER/DROP so routine DML queries
+# (INSERT, UPDATE, DELETE, SELECT) do not create excessive split points.
+_SQL_DECL_RE = re.compile(
+    r"(?i)^\s*(?:CREATE|ALTER|DROP)\s+(?:OR\s+REPLACE\s+)?"
+    r"(?:TABLE|VIEW|INDEX|UNIQUE\s+INDEX|PROCEDURE|FUNCTION|TRIGGER|"
+    r"DATABASE|SCHEMA|SEQUENCE|TYPE|ROLE|USER)\b"
+)
+
+# Matches assembly language entry points: named labels at column 0, ELF/NASM
+# section directives, and MASM-style PROC/ENDP markers.  The IGNORECASE flag
+# covers assembler mnemonics and directives that may be upper or lower case.
+_ASM_DECL_RE = re.compile(
+    r"^[\w.@?$]+\s*:"  # label definition — no leading whitespace (column-0)
+    r"|"
+    r"^\s*section\s+\."  # ELF/NASM section directive
+    r"|"
+    r"^\s*\w+\s+(?:proc|endp)\b",  # MASM proc/endp
+    re.IGNORECASE,
+)
+
 # Registry mapping file extension to the compiled declaration regex for chunking.
 # Extensions not listed here fall back to the single-chunk behaviour.
 _CHUNKERS: dict[str, re.Pattern] = {
+    # C#
     ".cs": _CS_DECL_RE,
+    # PHP
     ".php": _PHP_DECL_RE,
+    # C / C++
     ".c": _C_DECL_RE,
     ".cpp": _C_DECL_RE,
     ".h": _C_DECL_RE,
     ".hpp": _C_DECL_RE,
+    ".cc": _C_DECL_RE,
+    ".cxx": _C_DECL_RE,
+    ".hh": _C_DECL_RE,
+    ".hxx": _C_DECL_RE,
+    # Python
+    ".py": _PY_DECL_RE,
+    # JavaScript
+    ".js": _JS_DECL_RE,
+    ".mjs": _JS_DECL_RE,
+    ".cjs": _JS_DECL_RE,
+    # TypeScript
+    ".ts": _TS_DECL_RE,
+    ".tsx": _TS_DECL_RE,
+    # Java
+    ".java": _JAVA_DECL_RE,
+    # Go
+    ".go": _GO_DECL_RE,
+    # Ruby
+    ".rb": _RUBY_DECL_RE,
+    # Rust
+    ".rs": _RUST_DECL_RE,
+    # SQL
+    ".sql": _SQL_DECL_RE,
+    # Assembly
+    ".asm": _ASM_DECL_RE,
+    ".s": _ASM_DECL_RE,
+    ".S": _ASM_DECL_RE,
 }
+
+# Ordered tuple of all extensions that codeindex can index.  Used as the
+# default for index_all() and the server --ext argument so users get broad
+# language coverage out of the box.
+_ALL_EXTENSIONS: tuple[str, ...] = tuple(_CHUNKERS.keys())
 
 _EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
 _CHROMADB_VERSION = _pkg_version("chromadb")
@@ -193,7 +333,7 @@ class Indexer:
         self._hashes.pop(rel, None)
         self._save_hashes()
 
-    def index_all(self, extensions: tuple[str, ...] = (".cs",)) -> int:
+    def index_all(self, extensions: tuple[str, ...] = _ALL_EXTENSIONS) -> int:
         count = 0
         for ext in extensions:
             for f in self._root.rglob(f"*{ext}"):
